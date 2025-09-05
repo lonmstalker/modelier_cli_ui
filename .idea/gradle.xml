@@ -5,10 +5,15 @@
     <option name="linkedExternalProjectsSettings">
       <GradleProjectSettings>
         <option name="externalProjectPath" value="$PROJECT_DIR$" />
-        <option name="gradleJvm" value="21" />
+        <option name="gradleJvm" value="temurin-21" />
         <option name="modules">
           <set>
             <option value="$PROJECT_DIR$" />
+            <option value="$PROJECT_DIR$/core" />
+            <option value="$PROJECT_DIR$/desktop-ui" />
+            <option value="$PROJECT_DIR$/jetbrains-extension" />
+            <option value="$PROJECT_DIR$/vscode-extension" />
+            <option value="$PROJECT_DIR$/web-ui" />
           </set>
         </option>
       </GradleProjectSettings>

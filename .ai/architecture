@@ -1,0 +1,598 @@
+# Архитектура AI CLI Integration Plugin
+
+## 1. Используемые библиотеки
+
+### Core Dependencies
+```kotlin
+// IntelliJ Platform SDK
+dependencies {
+    // Основа платформы
+    implementation("com.jetbrains.intellij.platform:core-api:$platformVersion")
+    implementation("com.jetbrains.intellij.platform:editor:$platformVersion")
+    implementation("com.jetbrains.intellij.platform:project-model:$platformVersion")
+    
+    // Git интеграция
+    implementation("com.jetbrains.intellij.platform:vcs-git:$platformVersion")
+    
+    // UI Framework
+    implementation("com.jetbrains.intellij.platform:ui:$platformVersion")
+    implementation("com.jetbrains.intellij.platform:forms:$platformVersion")
+}
+```
+
+### Additional Libraries
+```kotlin
+dependencies {
+    // Async/Coroutines для параллельных AI запросов
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.8.0")
+    
+    // JSON обработка для конфигурации и API
+    implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.16.1")
+    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.16.1")
+    
+    // Vector Database для семантического поиска
+    implementation("org.apache.lucene:lucene-core:9.9.2")
+    implementation("org.apache.lucene:lucene-analysis-common:9.9.2")
+    implementation("org.apache.lucene:lucene-queryparser:9.9.2")
+    
+    // Embedding generation (локальные модели)
+    implementation("ai.onnxruntime:onnxruntime:1.17.1")
+    
+    // HTTP клиент для API взаимодействия
+    implementation("io.ktor:ktor-client-core:2.3.8")
+    implementation("io.ktor:ktor-client-cio:2.3.8")
+    implementation("io.ktor:ktor-client-content-negotiation:2.3.8")
+    implementation("io.ktor:ktor-serialization-jackson:2.3.8")
+    
+    // Криптография для безопасного хранения ключей
+    implementation("org.bouncycastle:bcprov-jdk18on:1.77")
+    
+    // Логирование
+    implementation("io.github.microutils:kotlin-logging:3.0.5")
+    
+    // Testing
+    testImplementation("io.mockk:mockk:1.13.9")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.0")
+    testImplementation("com.jetbrains.intellij.platform:test-framework:$platformVersion")
+}
+```
+
+## 2. Архитектурные принципы и паттерны
+
+### Clean Architecture
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Presentation  │    │    Business     │    │      Data       │
+│     Layer       │◄──►│     Logic       │◄──►│     Layer       │
+│                 │    │     Layer       │    │                 │
+│ - UI Components │    │ - Use Cases     │    │ - Repositories  │
+│ - Actions       │    │ - Services      │    │ - Data Sources  │
+│ - Tool Windows  │    │ - Domain Logic  │    │ - External APIs │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+```
+
+### Dependency Injection через IntelliJ Services
+```kotlin
+// Application-level services (синглтоны)
+@Service
+class AICliService : Disposable {
+    companion object {
+        fun getInstance(): AICliService = service()
+    }
+}
+
+// Project-level services
+@Service(Service.Level.PROJECT)
+class ProjectIndexingService(private val project: Project) : Disposable
+```
+
+### Publisher-Subscriber для событий
+```kotlin
+// Использование IntelliJ Application Bus
+interface AIOperationListener {
+    fun onOperationStarted(operation: AIOperation)
+    fun onOperationCompleted(operation: AIOperation, result: AIResponse)
+    fun onOperationFailed(operation: AIOperation, error: Throwable)
+}
+
+// Подписка через MessageBus
+project.messageBus
+    .connect(disposable)
+    .subscribe(AI_OPERATION_TOPIC, listener)
+```
+
+### Repository Pattern для данных
+```kotlin
+interface AIModelRepository {
+    suspend fun getAvailableModels(): List<AIModel>
+    suspend fun executeRequest(model: AIModel, request: AIRequest): AIResponse
+    suspend fun validateModel(model: AIModel): ValidationResult
+}
+
+interface ProjectContextRepository {
+    suspend fun getProjectContext(query: ContextQuery): ProjectContext
+    suspend fun updateIndex(files: List<VirtualFile>): IndexUpdateResult
+    suspend fun searchSemanticContext(query: String): List<CodeElement>
+}
+```
+
+## 3. Основные интерфейсы
+
+### 3.1 AI Model Abstraction
+```kotlin
+/**
+ * Абстракция для всех AI провайдеров
+ */
+interface AIProvider {
+    val name: String
+    val capabilities: Set<AICapability>
+    val configuration: AIProviderConfiguration
+    
+    suspend fun isAvailable(): Boolean
+    suspend fun execute(request: AIRequest): AIResponse
+    suspend fun validateConfiguration(): ValidationResult
+    suspend fun getUsageStats(): UsageStats
+}
+
+/**
+ * Конфигурация провайдера
+ */
+interface AIProviderConfiguration {
+    val executablePath: String?
+    val apiKey: String?
+    val customParameters: Map<String, Any>
+    val timeout: Duration
+    val maxTokens: Int?
+}
+
+/**
+ * Возможности AI модели
+ */
+enum class AICapability {
+    CODE_GENERATION,
+    CODE_EXPLANATION, 
+    CODE_REFACTORING,
+    BUG_FIXING,
+    TEST_GENERATION,
+    DOCUMENTATION_GENERATION,
+    CODE_REVIEW,
+    ARCHITECTURE_ANALYSIS,
+    SECURITY_ANALYSIS,
+    PERFORMANCE_OPTIMIZATION,
+    GIT_INTEGRATION,
+    MULTI_FILE_OPERATIONS
+}
+
+/**
+ * Запрос к AI
+ */
+data class AIRequest(
+    val command: AICommand,
+    val context: ProjectContext,
+    val parameters: Map<String, Any> = emptyMap(),
+    val targetModel: String? = null,
+    val priority: RequestPriority = RequestPriority.NORMAL
+)
+
+/**
+ * Ответ от AI
+ */
+data class AIResponse(
+    val success: Boolean,
+    val content: String,
+    val metadata: ResponseMetadata = ResponseMetadata(),
+    val error: AIError? = null,
+    val executionTime: Duration,
+    val tokensUsed: Int? = null
+)
+
+/**
+ * Типы AI команд
+ */
+sealed class AICommand {
+    data class ExplainCode(val code: String) : AICommand()
+    data class GenerateCode(val description: String, val language: String) : AICommand()
+    data class RefactorCode(val code: String, val instructions: String) : AICommand()
+    data class FixBug(val code: String, val error: String) : AICommand()
+    data class GenerateTests(val code: String, val framework: String) : AICommand()
+    data class ReviewCode(val code: String, val reviewType: ReviewType) : AICommand()
+    data class AnalyzeArchitecture(val projectStructure: ProjectStructure) : AICommand()
+    data class CustomPrompt(val prompt: String) : AICommand()
+}
+```
+
+### 3.2 System Integration Interface
+```kotlin
+/**
+ * Абстракция для взаимодействия с ОС
+ */
+interface SystemIntegration {
+    suspend fun detectPlatform(): Platform
+    suspend fun findExecutable(name: String): ExecutableInfo?
+    suspend fun installTool(tool: InstallableAITool): InstallationResult
+    suspend fun getEnvironmentVariables(): Map<String, String>
+    suspend fun executeCommand(command: SystemCommand): CommandResult
+}
+
+/**
+ * Кроссплатформенная информация об исполняемом файле
+ */
+data class ExecutableInfo(
+    val path: String,
+    val version: String?,
+    val isValid: Boolean,
+    val permissions: Set<FilePermission>,
+    val platform: Platform
+)
+
+/**
+ * Платформы
+ */
+enum class Platform {
+    WINDOWS, MACOS, LINUX;
+    
+    companion object {
+        fun current(): Platform = when {
+            System.getProperty("os.name").toLowerCase().contains("win") -> WINDOWS
+            System.getProperty("os.name").toLowerCase().contains("mac") -> MACOS
+            else -> LINUX
+        }
+    }
+}
+```
+
+### 3.3 Terminal/CLI Integration
+```kotlin
+/**
+ * Интерфейс для выполнения команд в терминале
+ */
+interface TerminalExecutor {
+    suspend fun execute(command: TerminalCommand): ExecutionResult
+    suspend fun executeAsync(command: TerminalCommand): AsyncExecutionHandle
+    suspend fun executeBatch(commands: List<TerminalCommand>): List<ExecutionResult>
+    fun createSession(): TerminalSession
+}
+
+/**
+ * Команда терминала
+ */
+data class TerminalCommand(
+    val executable: String,
+    val arguments: List<String> = emptyList(),
+    val workingDirectory: String? = null,
+    val environment: Map<String, String> = emptyMap(),
+    val timeout: Duration = Duration.ofMinutes(5),
+    val inputData: String? = null
+)
+
+/**
+ * Результат выполнения
+ */
+data class ExecutionResult(
+    val success: Boolean,
+    val exitCode: Int,
+    val stdout: String,
+    val stderr: String,
+    val executionTime: Duration,
+    val timedOut: Boolean = false
+)
+
+/**
+ * Сессия терминала для интерактивных команд
+ */
+interface TerminalSession : Disposable {
+    suspend fun sendCommand(command: String): String
+    suspend fun sendInput(input: String)
+    fun getOutput(): Flow<String>
+    fun isActive(): Boolean
+}
+```
+
+### 3.4 Project Context Interface
+```kotlin
+/**
+ * Контекст проекта для AI
+ */
+interface ProjectContextProvider {
+    suspend fun extractContext(query: ContextQuery): ProjectContext
+    suspend fun buildSmartContext(query: String, maxTokens: Int): SmartContext
+    suspend fun updateContext(changes: List<FileChange>)
+    suspend fun getRelevantFiles(query: String, limit: Int): List<VirtualFile>
+}
+
+/**
+ * Контекст проекта
+ */
+data class ProjectContext(
+    val project: Project,
+    val workingDirectory: String,
+    val selectedFiles: List<VirtualFile>,
+    val currentFile: VirtualFile?,
+    val selectedText: String?,
+    val cursorPosition: Int?,
+    val gitStatus: GitStatus?,
+    val projectStructure: ProjectStructure?,
+    val relevantDependencies: List<Dependency>,
+    val semanticContext: List<CodeElement>
+)
+
+/**
+ * Семантический элемент кода
+ */
+data class CodeElement(
+    val id: String,
+    val type: ElementType,
+    val name: String,
+    val file: VirtualFile,
+    val range: TextRange,
+    val signature: String?,
+    val documentation: String?,
+    val embedding: FloatArray?,
+    val dependencies: List<String>,
+    val usages: List<CodeReference>,
+    val relevanceScore: Double = 0.0
+)
+
+enum class ElementType {
+    CLASS, INTERFACE, FUNCTION, METHOD, VARIABLE, CONSTANT, 
+    ENUM, ANNOTATION, PACKAGE, MODULE, COMMENT, TEST
+}
+```
+
+### 3.5 Vector Database Interface
+```kotlin
+/**
+ * Интерфейс для векторной базы данных
+ */
+interface VectorDatabase : Disposable {
+    suspend fun add(id: String, vector: FloatArray, metadata: Map<String, Any>)
+    suspend fun addBatch(items: List<VectorItem>)
+    suspend fun search(queryVector: FloatArray, limit: Int = 10, threshold: Double = 0.0): List<SearchResult>
+    suspend fun update(id: String, vector: FloatArray, metadata: Map<String, Any>)
+    suspend fun delete(id: String)
+    suspend fun clear()
+    suspend fun size(): Int
+}
+
+/**
+ * Элемент векторной базы
+ */
+data class VectorItem(
+    val id: String,
+    val vector: FloatArray,
+    val metadata: Map<String, Any> = emptyMap()
+)
+
+/**
+ * Результат поиска
+ */
+data class SearchResult(
+    val id: String,
+    val similarity: Double,
+    val metadata: Map<String, Any>
+)
+```
+
+### 3.6 Multi-Model Orchestration
+```kotlin
+/**
+ * Оркестратор для работы с несколькими моделями
+ */
+interface MultiModelOrchestrator {
+    suspend fun executeParallel(
+        request: AIRequest, 
+        providers: List<AIProvider>
+    ): MultiModelResponse
+    
+    suspend fun compareResponses(
+        responses: Map<AIProvider, AIResponse>,
+        originalQuery: String
+    ): ComparisonResult
+    
+    suspend fun selectBestResponse(
+        responses: Map<AIProvider, AIResponse>,
+        comparison: ComparisonResult?
+    ): AIProvider
+}
+
+/**
+ * Результат мульти-модельного запроса
+ */
+data class MultiModelResponse(
+    val responses: Map<AIProvider, AIResponse>,
+    val comparison: ComparisonResult?,
+    val recommendedProvider: AIProvider,
+    val recommendedResponse: AIResponse,
+    val executionStats: ExecutionStats
+)
+
+/**
+ * Результат сравнения
+ */
+data class ComparisonResult(
+    val scores: Map<AIProvider, ComparisonScore>,
+    val winner: AIProvider,
+    val reasoning: String,
+    val confidence: Double,
+    val criteria: ComparisonCriteria
+)
+```
+
+## 4. Конвенции кодирования
+
+### 4.1 Naming Conventions
+```kotlin
+// Classes: PascalCase
+class AICodeAnalyzer
+interface ProjectContextProvider
+enum class AICapability
+
+// Functions and variables: camelCase
+fun executeAIRequest()
+val currentProject: Project
+
+// Constants: SCREAMING_SNAKE_CASE
+const val DEFAULT_TIMEOUT_SECONDS = 30
+const val MAX_CONTEXT_SIZE_TOKENS = 100000
+
+// Files: kebab-case или PascalCase для классов
+ai-cli-service.kt
+ProjectContextProvider.kt
+```
+
+### 4.2 Package Structure
+```
+com.github.lonmstalker.modeliercliui.
+├── core/                          # Основные интерфейсы и модели
+│   ├── models/                    # Data classes и enums
+│   ├── interfaces/                # Core интерфейсы
+│   └── exceptions/                # Custom исключения
+├── providers/                     # AI провайдеры
+│   ├── claude/                    # Claude Code интеграция
+│   ├── codex/                     # Codex интеграция
+│   ├── copilot/                   # GitHub Copilot интеграция
+│   └── base/                      # Базовые классы провайдеров
+├── services/                      # Бизнес-логика
+│   ├── execution/                 # Выполнение команд
+│   ├── indexing/                  # Индексирование проекта
+│   ├── context/                   # Работа с контекстом
+│   ├── comparison/                # Сравнение ответов
+│   └── configuration/             # Конфигурация
+├── infrastructure/                # Инфраструктурные сервисы
+│   ├── platform/                  # Платформо-зависимые операции
+│   ├── terminal/                  # Работа с терминалом
+│   ├── storage/                   # Хранение данных
+│   ├── security/                  # Безопасность
+│   └── vectordb/                  # Векторная база данных
+├── ui/                           # Пользовательский интерфейс
+│   ├── toolwindow/               # Tool Window компоненты
+│   ├── actions/                  # IDE Actions
+│   ├── settings/                 # Настройки
+│   ├── panels/                   # UI панели
+│   └── dialogs/                  # Диалоги
+├── utils/                        # Утилиты
+│   ├── extensions/               # Kotlin extensions
+│   ├── helpers/                  # Helper классы
+│   └── constants/                # Константы
+└── startup/                      # Инициализация плагина
+    ├── activities/               # Startup activities
+    └── listeners/                # Event listeners
+```
+
+### 4.3 Error Handling Strategy
+```kotlin
+// Используем sealed classes для типизированных ошибок
+sealed class AIError(message: String, cause: Throwable? = null) : Exception(message, cause) {
+    class ConfigurationError(message: String, cause: Throwable? = null) : AIError(message, cause)
+    class NetworkError(message: String, cause: Throwable? = null) : AIError(message, cause)
+    class AuthenticationError(message: String, cause: Throwable? = null) : AIError(message, cause)
+    class RateLimitError(message: String, val retryAfter: Duration? = null) : AIError(message)
+    class ModelNotAvailableError(message: String) : AIError(message)
+    class InvalidRequestError(message: String) : AIError(message)
+}
+
+// Result wrapper для методов, которые могут неудачно завершиться
+sealed class Result<out T> {
+    data class Success<T>(val data: T) : Result<T>()
+    data class Error(val exception: Throwable) : Result<Nothing>()
+    
+    inline fun <R> map(transform: (T) -> R): Result<R> = when (this) {
+        is Success -> Success(transform(data))
+        is Error -> this
+    }
+    
+    inline fun onSuccess(action: (T) -> Unit): Result<T> {
+        if (this is Success) action(data)
+        return this
+    }
+    
+    inline fun onError(action: (Throwable) -> Unit): Result<T> {
+        if (this is Error) action(exception)
+        return this
+    }
+}
+```
+
+### 4.4 Async Programming
+```kotlin
+// Используем coroutines для всех async операций
+class AICliService {
+    private val serviceScope = CoroutineScope(
+        SupervisorJob() + Dispatchers.Default + 
+        CoroutineName("AICliService")
+    )
+    
+    suspend fun executeRequest(request: AIRequest): Result<AIResponse> = withContext(Dispatchers.IO) {
+        try {
+            Result.Success(provider.execute(request))
+        } catch (e: Exception) {
+            Result.Error(e)
+        }
+    }
+    
+    // Для UI операций используем EDT
+    suspend fun updateUI(update: () -> Unit) = withContext(Dispatchers.EDT) {
+        update()
+    }
+}
+```
+
+### 4.5 Configuration Management
+```kotlin
+// Используем type-safe конфигурацию
+@State(
+    name = "AICliPluginSettings",
+    storages = [Storage("ai-cli-integration.xml")]
+)
+class AIPluginSettings : PersistentStateComponent<AIPluginSettings.State> {
+    
+    @Serializable
+    data class State(
+        val providers: Map<String, ProviderConfig> = emptyMap(),
+        val defaultProvider: String = "claude-code",
+        val enableLogging: Boolean = true,
+        val maxContextTokens: Int = 50000,
+        val enableMultiModel: Boolean = false
+    )
+    
+    @Serializable
+    data class ProviderConfig(
+        val enabled: Boolean = true,
+        val executablePath: String? = null,
+        val apiKey: String? = null,
+        val customParameters: Map<String, String> = emptyMap(),
+        val timeout: Long = 30000L // milliseconds
+    )
+}
+```
+
+## 5. Архитектурные решения
+
+### 5.1 Dependency Management
+- Используем IntelliJ Platform Services вместо внешних DI framework
+- Application-level services для синглтонов
+- Project-level services для проектно-зависимых компонентов
+
+### 5.2 State Management
+- Immutable data classes для всех моделей
+- State machines для сложных UI состояний
+- Event-driven архитектура через MessageBus
+
+### 5.3 Performance Considerations
+- Lazy initialization для тяжелых компонентов
+- Background threads для всех IO операций
+- Кеширование частых запросов
+- Pooling для переиспользуемых объектов
+
+### 5.4 Security
+- Безопасное хранение API ключей через IntelliJ PasswordSafe
+- Валидация всех пользовательских входов
+- Sandboxing для выполнения внешних команд
+- Audit logging для всех AI операций
+
+### 5.5 Extensibility
+- Plugin API для добавления новых AI провайдеров
+- Extension points для кастомизации UI
+- Event система для интеграции с другими плагинами
+- Configuration schema для type-safe настроек

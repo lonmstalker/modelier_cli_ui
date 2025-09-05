@@ -1,0 +1,20 @@
+package com.github.lonmstalker.aiintegration.core.models
+
+/**
+ * Возможности AI модели
+ */
+enum class AICapability {
+    CODE_GENERATION,
+    CODE_EXPLANATION, 
+    CODE_REFACTORING,
+    BUG_FIXING,
+    TEST_GENERATION,
+    DOCUMENTATION_GENERATION,
+    CODE_REVIEW,
+    ARCHITECTURE_ANALYSIS,
+    SECURITY_ANALYSIS,
+    PERFORMANCE_OPTIMIZATION,
+    GIT_INTEGRATION,
+    MULTI_FILE_OPERATIONS,
+    STREAMING_RESPONSE
+}

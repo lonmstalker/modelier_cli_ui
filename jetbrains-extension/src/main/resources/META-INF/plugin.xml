@@ -1,0 +1,87 @@
+<!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
+<idea-plugin>
+    <id>com.github.lonmstalker.aiintegration.jetbrains</id>
+    <name>AI CLI Integration</name>
+    <vendor>lonmstalker</vendor>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>Git4Idea</depends>
+
+    <resource-bundle>messages.AIBundle</resource-bundle>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <!-- Tool Window -->
+        <toolWindow 
+            factoryClass="com.github.lonmstalker.aiintegration.jetbrains.toolwindow.AIToolWindowFactory" 
+            id="AI CLI Integration"
+            icon="/icons/ai-tool.svg"
+            anchor="right"
+            secondary="false"/>
+        
+        <!-- Settings -->
+        <applicationConfigurable 
+            parentId="tools" 
+            instance="com.github.lonmstalker.aiintegration.jetbrains.settings.AIPluginConfigurable"
+            displayName="settings.displayName"/>
+        
+        <!-- Services -->
+        <applicationService 
+            serviceImplementation="com.github.lonmstalker.aiintegration.jetbrains.services.AIService"/>
+        
+        <projectService
+            serviceImplementation="com.github.lonmstalker.aiintegration.jetbrains.services.ProjectContextService"/>
+            
+        <!-- Startup Activity -->
+        <postStartupActivity 
+            implementation="com.github.lonmstalker.aiintegration.jetbrains.startup.AIPluginStartupActivity"/>
+        
+        <!-- Notifications -->
+        <notificationGroup 
+            id="AI CLI Integration" 
+            displayType="BALLOON"/>
+    </extensions>
+
+    <actions>
+        <group id="AIActions" text="action.group.AIActions.text" description="action.group.AIActions.description" popup="true">
+            <action id="ExplainCode" 
+                    class="com.github.lonmstalker.aiintegration.jetbrains.actions.ExplainCodeAction"
+                    text="action.ExplainCode.text"
+                    description="action.ExplainCode.description">
+                <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt E"/>
+            </action>
+            
+            <action id="GenerateCode" 
+                    class="com.github.lonmstalker.aiintegration.jetbrains.actions.GenerateCodeAction"
+                    text="action.GenerateCode.text"
+                    description="action.GenerateCode.description">
+                <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt G"/>
+            </action>
+            
+            <action id="RefactorCode" 
+                    class="com.github.lonmstalker.aiintegration.jetbrains.actions.RefactorCodeAction"
+                    text="action.RefactorCode.text"
+                    description="action.RefactorCode.description">
+                <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt R"/>
+            </action>
+            
+            <action id="ReviewCode" 
+                    class="com.github.lonmstalker.aiintegration.jetbrains.actions.ReviewCodeAction"
+                    text="action.ReviewCode.text"
+                    description="action.ReviewCode.description">
+            </action>
+            
+            <separator/>
+            
+            <action id="ShowAIToolWindow" 
+                    class="com.github.lonmstalker.aiintegration.jetbrains.actions.ShowAIToolWindowAction"
+                    text="action.ShowAIToolWindow.text"
+                    description="action.ShowAIToolWindow.description">
+                <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt H"/>
+            </action>
+            
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </group>
+    </actions>
+</idea-plugin>
