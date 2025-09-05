@@ -76,8 +76,28 @@ class AIService : AutoCloseable {
         request: AIRequest,
         providerNames: List<String>
     ): MultiModelResponse? {
-        // TODO: Implement multi-model orchestration
-        return null
+        return withContext(Dispatchers.IO) {
+            try {
+                val requestedProviders = if (providerNames.isEmpty()) {
+                    providers.values.toList()
+                } else {
+                    providerNames.mapNotNull { providers[it] }
+                }
+                
+                if (requestedProviders.isEmpty()) {
+                    logger.warn("No valid providers found for multi-model request")
+                    return@withContext null
+                }
+                
+                logger.info("Executing multi-model request with ${requestedProviders.size} providers")
+                val orchestrator = com.github.lonmstalker.aiintegration.jetbrains.services.MultiModelOrchestratorFactory.getInstance()
+                orchestrator.executeParallel(request, requestedProviders)
+                
+            } catch (e: Exception) {
+                logger.error("Multi-model request failed", e)
+                null
+            }
+        }
     }
     
     /**
@@ -95,8 +115,16 @@ class AIService : AutoCloseable {
     }
     
     private suspend fun initializeProviders() {
-        // TODO: Load providers from Core module
         logger.info("Initializing AI providers...")
+        
+        // Register Echo Provider for demonstration
+        try {
+            val echoProvider = com.github.lonmstalker.aiintegration.jetbrains.providers.EchoProvider()
+            registerProvider(echoProvider)
+            logger.info("Echo Provider registered successfully")
+        } catch (e: Exception) {
+            logger.error("Failed to register Echo Provider", e)
+        }
     }
     
     override fun close() {

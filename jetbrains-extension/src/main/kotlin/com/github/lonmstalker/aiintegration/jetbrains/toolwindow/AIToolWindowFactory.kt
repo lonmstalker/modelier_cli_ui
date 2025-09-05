@@ -6,16 +6,11 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.ui.content.ContentFactory
-import javax.swing.JLabel
-import javax.swing.JPanel
-import java.awt.BorderLayout
 
 class AIToolWindowFactory : ToolWindowFactory, DumbAware {
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
-        val panel = JPanel(BorderLayout()).apply {
-            add(JLabel(AIBundle.message("toolwindow.ai.title")), BorderLayout.NORTH)
-        }
-        val content = ContentFactory.getInstance().createContent(panel, AIBundle.message("toolwindow.ai.title"), false)
+        val chatPanel = AIChatPanel(project)
+        val content = ContentFactory.getInstance().createContent(chatPanel, "AI Assistant", false)
         toolWindow.contentManager.addContent(content)
     }
 }
