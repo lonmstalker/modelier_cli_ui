@@ -54,7 +54,7 @@ dependencies {
     implementation("ch.qos.logback:logback-classic:1.4.14")
     
     // Конфигурация
-    implementation("com.typesafe:config:1.4.3")
+    implementation("com.typesafe:config:1.4.5")
     
     // Процессы и система
     implementation("org.apache.commons:commons-exec:1.4.0")
