@@ -26,17 +26,17 @@ dependencies {
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.16.1")
     
     // HTTP клиент для API взаимодействия
-    implementation("io.ktor:ktor-client-core:2.3.8")
-    implementation("io.ktor:ktor-client-cio:2.3.8")
-    implementation("io.ktor:ktor-client-content-negotiation:2.3.8")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.8")
+    implementation("io.ktor:ktor-client-core:3.3.1")
+    implementation("io.ktor:ktor-client-cio:3.3.1")
+    implementation("io.ktor:ktor-client-content-negotiation:3.3.1")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:3.3.1")
     
     // HTTP сервер для API
-    implementation("io.ktor:ktor-server-core:2.3.8")
-    implementation("io.ktor:ktor-server-netty:2.3.8")
-    implementation("io.ktor:ktor-server-content-negotiation:2.3.8")
-    implementation("io.ktor:ktor-server-cors:2.3.8")
-    implementation("io.ktor:ktor-server-websockets:2.3.8")
+    implementation("io.ktor:ktor-server-core:3.3.1")
+    implementation("io.ktor:ktor-server-netty:3.3.1")
+    implementation("io.ktor:ktor-server-content-negotiation:3.3.1")
+    implementation("io.ktor:ktor-server-cors:3.3.1")
+    implementation("io.ktor:ktor-server-websockets:3.3.1")
     
     // Vector Database для семантического поиска
     implementation("org.apache.lucene:lucene-core:9.9.2")
@@ -63,7 +63,7 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
     testImplementation("io.mockk:mockk:1.13.9")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.0")
-    testImplementation("io.ktor:ktor-server-test-host:2.3.8")
+    testImplementation("io.ktor:ktor-server-test-host:3.3.1")
 }
 
 tasks.test {
